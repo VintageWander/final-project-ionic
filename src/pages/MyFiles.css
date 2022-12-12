@@ -1,0 +1,24 @@
+#cloud-icon,
+#folder-icon {
+  font-size: 64px;
+}
+#offline-grid {
+  width: 100%;
+  height: 100%;
+}
+
+#folder-title:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+#bread {
+  cursor: pointer;
+  text-decoration: underline;
+}
+#add-button {
+  margin: 20px;
+}
+
+#add-icon {
+  margin-right: 10px;
+}

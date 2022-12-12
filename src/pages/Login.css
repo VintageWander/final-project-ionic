@@ -1,0 +1,13 @@
+#login-icon {
+  font-size: 64px;
+}
+
+#profile-grid {
+  width: 100%;
+  height: 100%;
+}
+
+#login-label:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
