@@ -46,7 +46,6 @@ import { Menu, MenuItem } from "@szhsin/react-menu";
 import { Form, Modal } from "react-bootstrap";
 
 import "./MyFiles.css";
-import { response } from "express";
 
 export const MyFiles = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -161,7 +160,7 @@ export const MyFiles = () => {
     try {
       const response = await axios.get(
         `/file/?owner=${user.id}&${
-          currentPath ? `position=${currentPath}` : ""
+          currentPath ? `position=${currentPath}` : `position=${user.username}/`
         }`
       );
 
@@ -180,7 +179,7 @@ export const MyFiles = () => {
     try {
       const response = await axios.get(
         `/folder/?owner=${user.id}&${
-          currentPath ? `position=${currentPath}` : ""
+          currentPath ? `position=${currentPath}` : `position=${user.username}/`
         }`
       );
 
@@ -1052,47 +1051,22 @@ export const MyFiles = () => {
             />
             <Form.Select
               onChange={(e) => {
-                console.log(e.target.value);
-                setExpiryTime(e.target.value);
+                setExpiryTime(
+                  new Date(Date.now() + Number.parseInt(e.target.value))
+                    .getTime()
+                    .toString()
+                );
               }}
             >
-              <option value={new Date(Date.now() + 5 * 60 * 1000).getTime()}>
-                5 Minutes
-              </option>
-              <option value={new Date(Date.now() + 10 * 60 * 1000).getTime()}>
-                10 Minutes
-              </option>
-              <option value={new Date(Date.now() + 15 * 60 * 1000).getTime()}>
-                15 Minutes
-              </option>
-              <option value={new Date(Date.now() + 30 * 60 * 1000).getTime()}>
-                30 Minutes
-              </option>
-              <option
-                value={new Date(Date.now() + 1 * 60 * 60 * 1000).getTime()}
-              >
-                1 Hour
-              </option>
-              <option
-                value={new Date(Date.now() + 6 * 60 * 60 * 1000).getTime()}
-              >
-                6 Hours
-              </option>
-              <option
-                value={new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).getTime()}
-              >
-                1 Day
-              </option>
-              <option
-                value={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).getTime()}
-              >
-                3 Days
-              </option>
-              <option
-                value={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).getTime()}
-              >
-                7 Days
-              </option>
+              <option value={5 * 60 * 1000}>5 Minutes</option>
+              <option value={10 * 60 * 1000}>10 Minutes</option>
+              <option value={15 * 60 * 1000}>15 Minutes</option>
+              <option value={30 * 60 * 1000}>30 Minutes</option>
+              <option value={1 * 60 * 60 * 1000}>1 Hour</option>
+              <option value={6 * 60 * 60 * 1000}>6 Hours</option>
+              <option value={1 * 24 * 60 * 60 * 1000}>1 Day</option>
+              <option value={3 * 24 * 60 * 60 * 1000}>3 Days</option>
+              <option value={7 * 24 * 60 * 60 * 1000}>7 Days</option>
             </Form.Select>
           </IonCardContent>
         </IonCard>
@@ -1103,6 +1077,8 @@ export const MyFiles = () => {
   useEffect(() => {
     if (isLoggedIn) {
       getData();
+      setCurrentPath(`${user.username}/`);
+      setBreadCrumbs([`${user.username}/`]);
       getFiles();
       getFolders();
       getAllFolders();
