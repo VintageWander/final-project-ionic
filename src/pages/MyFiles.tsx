@@ -33,6 +33,8 @@ import ReactCompareImage from "react-compare-image";
 import { File } from "../model/File";
 import { Folder } from "../model/Folder";
 
+import QRCode from "react-qr-code";
+
 import { API } from "..";
 import {
   cloudOfflineOutline,
@@ -44,6 +46,7 @@ import { Menu, MenuItem } from "@szhsin/react-menu";
 import { Form, Modal } from "react-bootstrap";
 
 import "./MyFiles.css";
+import { response } from "express";
 
 export const MyFiles = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +60,7 @@ export const MyFiles = () => {
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showDeleteFile, setShowDeleteFile] = useState(false);
   const [showDeleteFolder, setShowDeleteFolder] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   const [user, setUser] = useAtom(store.user);
   const [isLoggedIn, setIsLoggedIn] = useAtom(store.loggedIn);
@@ -78,6 +82,8 @@ export const MyFiles = () => {
   const [newPosition, setNewPosition] = useState("");
   const [newVisibility, setNewVisibility] = useState("");
 
+  const [expiryTime, setExpiryTime] = useState("");
+
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [preview, setPreview] = useState("");
 
@@ -89,102 +95,119 @@ export const MyFiles = () => {
 
   const [isFoldernameValid, setIsFoldernameValid] = useState(true);
 
-  const getData = () => {
-    setIsLoading(true);
-    axios
-      .get("/user/profile")
-      .then((response) => {
-        const result = response.data.data;
+  const getData = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.get("/user/profile");
+      if (!response) {
+        const retry = await axios.get("/user/refresh");
+
+        const result = retry.data.data;
+
         setUser({
           id: result.id,
           username: result.username,
           email: result.email,
-          files: result.files,
-          folders: result.folders,
+          files: [],
+          folders: [],
         });
 
-        setCurrentPath(new String(`${user.username}/`));
-        setBreadCrumbs([...breadCrumbs, new String(`${user.username}/`)]);
-        setIsLoggedIn(true);
+        setCurrentPath(`${user.username}/`);
+        setBreadCrumbs([`${user.username}/`]);
         setIsLoading(false);
         setPreview("");
         setSelectedFile(null);
-      })
-      .catch(() => {
-        axios
-          .post("/user/refresh")
-          .then(() => getData())
-          .catch(() => {
-            toast({
-              message:
-                "Cannot get user profile, this might be due to session timeout",
-              duration: 3000,
-              position: "top",
-            });
-            setUser({
-              id: "",
-              username: "",
-              email: "",
-              files: [],
-              folders: [],
-            });
+      }
 
-            setCurrentPath("");
-            setBreadCrumbs([]);
-            setIsLoggedIn(false);
-            setIsLoading(false);
-            setPreview("");
-            setSelectedFile(null);
-          });
+      const result = response.data.data;
+      setUser({
+        id: result.id,
+        username: result.username,
+        email: result.email,
+        files: [],
+        folders: [],
       });
+
+      setCurrentPath(`${user.username}/`);
+      setBreadCrumbs([`${user.username}/`]);
+      setIsLoading(false);
+      setPreview("");
+      setSelectedFile(null);
+    } catch (err) {
+      toast({
+        message:
+          "Cannot get user profile, this might be due to session timeout",
+        duration: 3000,
+        position: "top",
+      });
+      setUser({
+        id: "",
+        username: "",
+        email: "",
+        files: [],
+        folders: [],
+      });
+
+      setCurrentPath("");
+      setBreadCrumbs([]);
+      setIsLoggedIn(false);
+      setIsLoading(false);
+      setPreview("");
+      setSelectedFile(null);
+    }
   };
 
-  const getFiles = () => {
-    axios
-      .get(`/file/?owner=${user.id}&position=${currentPath}`)
-      .then((response) => {
-        const result = response.data.data;
-        setFiles(result);
-      })
-      .catch((err) =>
-        toast({
-          message: "Cannot get user's files",
-          duration: 3000,
-          position: "top",
-        })
+  const getFiles = async () => {
+    try {
+      const response = await axios.get(
+        `/file/?owner=${user.id}&${
+          currentPath ? `position=${currentPath}` : ""
+        }`
       );
+
+      const result = response.data.data;
+      setFiles(result);
+    } catch (err) {
+      toast({
+        message: "Cannot get user's files",
+        duration: 3000,
+        position: "top",
+      });
+    }
   };
 
-  const getFolders = () => {
-    axios
-      .get(`/folder/?owner=${user.id}&position=${currentPath}`)
-      .then((response) => {
-        const result = response.data.data;
-        setFolders(result);
-      })
-      .catch((err) =>
-        toast({
-          message: "Cannot get user's folders",
-          duration: 3000,
-          position: "top",
-        })
+  const getFolders = async () => {
+    try {
+      const response = await axios.get(
+        `/folder/?owner=${user.id}&${
+          currentPath ? `position=${currentPath}` : ""
+        }`
       );
+
+      const result = response.data.data;
+      setFolders(result);
+    } catch (err) {
+      toast({
+        message: "Cannot get user's folders",
+        duration: 3000,
+        position: "top",
+      });
+    }
   };
 
-  const getAllFolders = () => {
-    axios
-      .get(`/folder/?owner=${user.id}`)
-      .then((response) => {
-        const result = response.data.data;
-        setAllFolders(result);
-      })
-      .catch((err) =>
-        toast({
-          message: "Cannot get user's folders",
-          duration: 3000,
-          position: "top",
-        })
-      );
+  const getAllFolders = async () => {
+    try {
+      const response = await axios.get(`/folder/?owner=${user.id}`);
+
+      const result = response.data.data;
+      setAllFolders(result);
+    } catch (err) {
+      toast({
+        message: "Cannot get user's folders",
+        duration: 3000,
+        position: "top",
+      });
+    }
   };
 
   const handleUpdate = (id: string) => {
@@ -308,6 +331,7 @@ export const MyFiles = () => {
     setShowDeleteFile(false);
     setShowDeleteFolder(false);
     setShowEditFolder(false);
+    setShowQr(false);
     setFolderName("");
     setIsFoldernameValid(true);
   };
@@ -320,11 +344,16 @@ export const MyFiles = () => {
       <Modal
         key={currentFileVersion!}
         show={showCompare}
-        onHide={() => setShowCompare(false)}
+        onHide={() => {
+          setShowCompare(false);
+          setCurrentFile(undefined);
+        }}
       >
         <ReactCompareImage
           leftImage={`${API}/content/${currentFile!.id}`}
+          leftImageLabel={"Before"}
           rightImage={right}
+          rightImageLabel={"After"}
         />
       </Modal>
     );
@@ -512,7 +541,9 @@ export const MyFiles = () => {
                       </IonButton>
                       <IonButton
                         fill="clear"
-                        onClick={() => handleRestore(currentFile!.id, version)}
+                        onClick={async () =>
+                          await handleRestore(currentFile!.id, version)
+                        }
                       >
                         {isLoading && (
                           <IonSpinner color={"dark"} name={"circular"} />
@@ -522,8 +553,8 @@ export const MyFiles = () => {
 
                       <IonButton
                         fill="clear"
-                        onClick={() =>
-                          handleDeleteVersion(currentFile!.id, version)
+                        onClick={async () =>
+                          await handleDeleteVersion(currentFile!.id, version)
                         }
                       >
                         {isLoading && (
@@ -686,7 +717,7 @@ export const MyFiles = () => {
           <IonCardHeader>
             <IonCardTitle>Create new file</IonCardTitle>
           </IonCardHeader>
-          <img src={preview} />
+          <object data={preview} />
 
           <IonCardContent>
             <IonItem>
@@ -996,10 +1027,82 @@ export const MyFiles = () => {
     setIsLoading(false);
   };
 
+  const showQrModal = () => {
+    const user_id = user.id;
+    const file_id = currentFile!.id;
+    const link = `${API}/content/${file_id}?owner=${user_id}&expiry_time=${expiryTime}`;
+
+    return (
+      <Modal
+        onHide={() => {
+          setCurrentFile(undefined);
+          setShowQr(false);
+        }}
+        show={showQr}
+        style={{ height: "1000px", width: "1000px" }}
+      >
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>Sharable QR code</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <QRCode
+              value={link}
+              style={{ background: "white", padding: "16px" }}
+            />
+            <Form.Select
+              onChange={(e) => {
+                console.log(e.target.value);
+                setExpiryTime(e.target.value);
+              }}
+            >
+              <option value={new Date(Date.now() + 5 * 60 * 1000).getTime()}>
+                5 Minutes
+              </option>
+              <option value={new Date(Date.now() + 10 * 60 * 1000).getTime()}>
+                10 Minutes
+              </option>
+              <option value={new Date(Date.now() + 15 * 60 * 1000).getTime()}>
+                15 Minutes
+              </option>
+              <option value={new Date(Date.now() + 30 * 60 * 1000).getTime()}>
+                30 Minutes
+              </option>
+              <option
+                value={new Date(Date.now() + 1 * 60 * 60 * 1000).getTime()}
+              >
+                1 Hour
+              </option>
+              <option
+                value={new Date(Date.now() + 6 * 60 * 60 * 1000).getTime()}
+              >
+                6 Hours
+              </option>
+              <option
+                value={new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).getTime()}
+              >
+                1 Day
+              </option>
+              <option
+                value={new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).getTime()}
+              >
+                3 Days
+              </option>
+              <option
+                value={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).getTime()}
+              >
+                7 Days
+              </option>
+            </Form.Select>
+          </IonCardContent>
+        </IonCard>
+      </Modal>
+    );
+  };
+
   useEffect(() => {
     if (isLoggedIn) {
       getData();
-      console.log(currentPath);
       getFiles();
       getFolders();
       getAllFolders();
@@ -1008,20 +1111,19 @@ export const MyFiles = () => {
 
   useEffect(() => {
     if (isLoggedIn) {
-      console.log(currentPath);
       getFiles();
       getFolders();
       getAllFolders();
     }
   }, [
     currentPath,
-    showEdit,
-    showDeleteFile,
+    showVersions,
     showCreate,
     showCreateFolder,
+    showEdit,
     showEditFolder,
+    showDeleteFile,
     showDeleteFolder,
-    showVersions,
   ]);
 
   const getVersions = async (id: string) => {
@@ -1144,8 +1246,16 @@ export const MyFiles = () => {
                         </MenuItem>
                         <MenuItem
                           onClick={() => {
+                            setCurrentFile(file);
+                            setShowQr(true);
+                          }}
+                        >
+                          Get QR code
+                        </MenuItem>
+                        <MenuItem
+                          onClick={async () => {
                             setShowVersions(true);
-                            getVersions(file.id);
+                            await getVersions(file.id);
                             setCurrentFile(file);
                           }}
                         >
@@ -1169,6 +1279,7 @@ export const MyFiles = () => {
             )}
             {showEdit && showEditModal()}
             {showVersions && showVersionsModal()}
+            {showQr && showQrModal()}
             {showCompare && showCompareModal()}
             {showCreate && showCreateModal()}
             {showCreateFolder && showCreateFolderModal()}
