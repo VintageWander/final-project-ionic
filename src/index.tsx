@@ -11,7 +11,6 @@ import "@szhsin/react-menu/dist/transitions/slide.css";
 
 export const API = "https://file-management-backend.onrender.com";
 // export const API = "http://127.0.0.1:8000";
-// export const API ="https://lafayette-enzyme-beats-collectors.trycloudflare.com";
 
 axios.defaults.baseURL = API;
 axios.defaults.withCredentials = true;

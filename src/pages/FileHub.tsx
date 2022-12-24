@@ -1,3 +1,4 @@
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import {
   IonBreadcrumb,
   IonBreadcrumbs,
@@ -25,8 +26,9 @@ import axios from "axios";
 import { folderOpenOutline, warningOutline } from "ionicons/icons";
 import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
-import { Modal } from "react-bootstrap";
+import { Form, Modal } from "react-bootstrap";
 import ReactCompareImage from "react-compare-image";
+import QRCode from "react-qr-code";
 import { API } from "..";
 import { File } from "../model/File";
 import { Folder } from "../model/Folder";
@@ -34,6 +36,8 @@ import state from "../store";
 import "./FileHub.css";
 
 export const FileHub = () => {
+  const [animateParent] = useAutoAnimate<HTMLIonRowElement>();
+
   const [user, setUser] = useAtom(state.user);
   const [isLoggedIn, setIsLoggedIn] = useAtom(state.loggedIn);
 
@@ -45,10 +49,13 @@ export const FileHub = () => {
 
   const [currentFile, setCurrentFile] = useState<File>();
 
+  const [expiryTime, setExpiryTime] = useState("");
+
   const [currentFileVersion, setCurrentFileVersion] = useState(0);
 
   const [showVersions, setShowVersions] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   const [versions, setVersions] = useState<number[]>([]);
 
@@ -128,8 +135,70 @@ export const FileHub = () => {
       >
         <ReactCompareImage
           leftImage={`${API}/content/${currentFile!.id}`}
+          leftImageLabel={"Before"}
           rightImage={right}
+          rightImageLabel={"After"}
         />
+      </Modal>
+    );
+  };
+
+  const showQrModal = () => {
+    const user_id = user.id;
+    const file_id = currentFile!.id;
+    const link = `${API}/content/${file_id}?owner=${user_id}&expiry_time=${expiryTime}`;
+
+    return (
+      <Modal
+        onHide={() => {
+          setCurrentFile(undefined);
+          setShowQr(false);
+        }}
+        show={showQr}
+      >
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>Sharable QR code</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <IonGrid>
+              <IonRow class="ion-justify-content-center">
+                <QRCode
+                  value={link}
+                  style={{
+                    background: "white",
+                    padding: "16px",
+                  }}
+                />
+              </IonRow>
+              <IonRow>
+                Download link:
+                <a href={link}>{link}</a>
+              </IonRow>
+              <IonRow class="ion-justify-content-center">
+                <Form.Select
+                  onChange={(e) => {
+                    setExpiryTime(
+                      new Date(Date.now() + Number.parseInt(e.target.value))
+                        .getTime()
+                        .toString()
+                    );
+                  }}
+                >
+                  <option value={5 * 60 * 1000}>5 Minutes</option>
+                  <option value={10 * 60 * 1000}>10 Minutes</option>
+                  <option value={15 * 60 * 1000}>15 Minutes</option>
+                  <option value={30 * 60 * 1000}>30 Minutes</option>
+                  <option value={1 * 60 * 60 * 1000}>1 Hour</option>
+                  <option value={6 * 60 * 60 * 1000}>6 Hours</option>
+                  <option value={1 * 24 * 60 * 60 * 1000}>1 Day</option>
+                  <option value={3 * 24 * 60 * 60 * 1000}>3 Days</option>
+                  <option value={7 * 24 * 60 * 60 * 1000}>7 Days</option>
+                </Form.Select>
+              </IonRow>
+            </IonGrid>
+          </IonCardContent>
+        </IonCard>
       </Modal>
     );
   };
@@ -177,6 +246,27 @@ export const FileHub = () => {
   }, []);
 
   useEffect(() => {
+    axios
+      .get(
+        `/file/${currentPath ? `?position=${currentPath}&` : ""}${
+          isLoggedIn ? `?owner=${user.id}` : ""
+        }`
+      )
+      .then((response) => {
+        setFiles(response.data.data);
+      });
+    axios
+      .get(
+        `/folder/${currentPath ? `?position=${currentPath}&` : ""}${
+          isLoggedIn ? `?owner=${user.id}` : ""
+        }`
+      )
+      .then((response) => {
+        setFolders(response.data.data);
+      });
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     setBreadCrumbs(["Root", ...breadCrumbs]);
   }, []);
 
@@ -209,7 +299,7 @@ export const FileHub = () => {
           ))}
         </IonBreadcrumbs>
         <IonGrid>
-          <IonRow class="ion-justify-content-center">
+          <IonRow class="ion-justify-content-center" ref={animateParent}>
             {files.map((file) => (
               <IonCol key={file.id} size="12" sizeSm="7" sizeMd="6" sizeLg="3">
                 <IonCard>
@@ -234,6 +324,21 @@ export const FileHub = () => {
                     </MenuItem>
                     <MenuItem
                       onClick={() => {
+                        setCurrentFile(file);
+                        setExpiryTime(
+                          new Date(
+                            Date.now() + Number.parseInt("5 * 60 * 1000")
+                          )
+                            .getTime()
+                            .toString()
+                        );
+                        setShowQr(true);
+                      }}
+                    >
+                      Show QR
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
                         setShowVersions(true);
                         setCurrentFile(file);
                         getVersions(file.id);
@@ -247,6 +352,7 @@ export const FileHub = () => {
             ))}
             {showVersions && showVersionsModal()}
             {showCompare && showCompareModal()}
+            {showQr && showQrModal()}
             {folders.map((folder) => (
               <IonCol
                 key={folder.id}

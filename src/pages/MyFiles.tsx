@@ -46,10 +46,13 @@ import { Menu, MenuItem } from "@szhsin/react-menu";
 import { Form, Modal } from "react-bootstrap";
 
 import "./MyFiles.css";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 export const MyFiles = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [toast] = useIonToast();
+
+  const [animateParent] = useAutoAnimate<HTMLIonRowElement>();
 
   const [showEdit, setShowEdit] = useState(false);
   const [showEditFolder, setShowEditFolder] = useState(false);
@@ -98,9 +101,10 @@ export const MyFiles = () => {
     try {
       setIsLoading(true);
       const response = await axios.get("/user/profile");
+      console.log("refresh hit");
       if (!response) {
         const retry = await axios.get("/user/refresh");
-
+        console.log("refresh hit");
         const result = retry.data.data;
 
         setUser({
@@ -219,8 +223,8 @@ export const MyFiles = () => {
         `/file/update/${id}`,
         {
           file: selectedFile,
-          position: updatePosition,
-          visibility: updateVisibility,
+          position: updatePosition ?? currentFile!.position,
+          visibility: updateVisibility ?? currentFile!.visibility,
         },
         {
           headers: {
@@ -256,8 +260,8 @@ export const MyFiles = () => {
         `/file/create/`,
         {
           file: selectedFile,
-          position: newPosition,
-          visibility: newVisibility,
+          position: newPosition ?? "",
+          visibility: newVisibility ?? "public",
         },
         {
           headers: {
@@ -291,8 +295,8 @@ export const MyFiles = () => {
     axios
       .post(`/folder/create/`, {
         folderName,
-        position: newPosition,
-        visibility: newVisibility,
+        position: newPosition ?? "",
+        visibility: newVisibility ?? "public",
       })
       .then(() => {
         toast({
@@ -345,7 +349,6 @@ export const MyFiles = () => {
         show={showCompare}
         onHide={() => {
           setShowCompare(false);
-          setCurrentFile(undefined);
         }}
       >
         <ReactCompareImage
@@ -371,15 +374,18 @@ export const MyFiles = () => {
           <IonCardHeader>
             <IonCardTitle>Edit</IonCardTitle>
           </IonCardHeader>
-
-          {preview ? (
-            <img alt={`${currentFile!.filename}`} src={preview} />
-          ) : (
-            <img
-              alt={`${currentFile!.filename}`}
-              src={`${API}/content/${currentFile!.id}`}
-            />
-          )}
+          <IonGrid>
+            <IonRow class="ion-justify-content-center">
+              {preview ? (
+                <img alt={`${currentFile!.filename}`} src={preview} />
+              ) : (
+                <img
+                  alt={`${currentFile!.filename}`}
+                  src={`${API}/content/${currentFile!.id}`}
+                />
+              )}
+            </IonRow>
+          </IonGrid>
 
           <IonItem>
             <Form.Group>
@@ -387,13 +393,17 @@ export const MyFiles = () => {
               <Form.Control
                 type="file"
                 accept={
-                  ["jpeg", "jpg"].includes(currentFile!.extension)
-                    ? "image/jpeg"
-                    : currentFile!.extension === "mp3"
-                    ? "audio/mp3"
-                    : currentFile!.extension === "txt"
-                    ? "text/plain"
-                    : "something"
+                  currentFile
+                    ? ["jpeg", "jpg"].includes(currentFile!.extension)
+                      ? "image/jpeg"
+                      : currentFile!.extension === "mp3"
+                      ? "audio/mp3"
+                      : currentFile!.extension === "txt"
+                      ? "text/plain"
+                      : currentFile!.extension === "png"
+                      ? "image/png"
+                      : "something"
+                    : "image/jpeg image/png audio/mp3 text/plain"
                 }
                 onChange={(e) => {
                   console.log((e.target as HTMLInputElement).files![0]);
@@ -716,7 +726,11 @@ export const MyFiles = () => {
           <IonCardHeader>
             <IonCardTitle>Create new file</IonCardTitle>
           </IonCardHeader>
-          <object data={preview} />
+          <IonGrid>
+            <IonRow class="ion-justify-content-center">
+              {preview && <img src={preview} height="60%" width="60%" />}
+            </IonRow>
+          </IonGrid>
 
           <IonCardContent>
             <IonItem>
@@ -732,6 +746,8 @@ export const MyFiles = () => {
                         ? "audio/mp3"
                         : currentFile!.extension === "txt"
                         ? "text/plain"
+                        : currentFile!.extension === "png"
+                        ? "image/png"
                         : "something"
                       : "image/jpeg image/png audio/mp3 text/plain"
                   }
@@ -806,7 +822,9 @@ export const MyFiles = () => {
                 <IonToggle
                   slot="end"
                   onIonChange={(e) => {
-                    setNewVisibility(e.detail.checked ? "public" : "private");
+                    setNewVisibility(
+                      e.detail.checked === true ? "public" : "private"
+                    );
                   }}
                 />
               </IonItem>
@@ -994,17 +1012,21 @@ export const MyFiles = () => {
 
     console.log({
       folderName,
-      visibility: updateVisibility || currentFolder!.visibility,
+      visibility:
+        updateVisibility === "" ? currentFolder!.visibility : updateVisibility,
       position:
-        updatePosition ||
+        updatePosition ??
         currentFolder!.position.slice(user.username.length + 1),
     });
     axios
       .put(`/folder/update/${folder_id}`, {
         folderName,
-        visibility: updateVisibility || currentFolder!.visibility,
+        visibility:
+          updateVisibility === ""
+            ? currentFolder!.visibility
+            : updateVisibility,
         position:
-          updatePosition ||
+          updatePosition ??
           currentFolder!.position.slice(user.username.length + 1),
       })
       .then((response) => {
@@ -1038,36 +1060,48 @@ export const MyFiles = () => {
           setShowQr(false);
         }}
         show={showQr}
-        style={{ height: "1000px", width: "1000px" }}
       >
         <IonCard>
           <IonCardHeader>
             <IonCardTitle>Sharable QR code</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
-            <QRCode
-              value={link}
-              style={{ background: "white", padding: "16px" }}
-            />
-            <Form.Select
-              onChange={(e) => {
-                setExpiryTime(
-                  new Date(Date.now() + Number.parseInt(e.target.value))
-                    .getTime()
-                    .toString()
-                );
-              }}
-            >
-              <option value={5 * 60 * 1000}>5 Minutes</option>
-              <option value={10 * 60 * 1000}>10 Minutes</option>
-              <option value={15 * 60 * 1000}>15 Minutes</option>
-              <option value={30 * 60 * 1000}>30 Minutes</option>
-              <option value={1 * 60 * 60 * 1000}>1 Hour</option>
-              <option value={6 * 60 * 60 * 1000}>6 Hours</option>
-              <option value={1 * 24 * 60 * 60 * 1000}>1 Day</option>
-              <option value={3 * 24 * 60 * 60 * 1000}>3 Days</option>
-              <option value={7 * 24 * 60 * 60 * 1000}>7 Days</option>
-            </Form.Select>
+            <IonGrid>
+              <IonRow class="ion-justify-content-center">
+                <QRCode
+                  value={link}
+                  style={{
+                    background: "white",
+                    padding: "16px",
+                  }}
+                />
+              </IonRow>
+              <IonRow>
+                Download link:
+                <a href={link}>{link}</a>
+              </IonRow>
+              <IonRow class="ion-justify-content-center">
+                <Form.Select
+                  onChange={(e) => {
+                    setExpiryTime(
+                      new Date(Date.now() + Number.parseInt(e.target.value))
+                        .getTime()
+                        .toString()
+                    );
+                  }}
+                >
+                  <option value={5 * 60 * 1000}>5 Minutes</option>
+                  <option value={10 * 60 * 1000}>10 Minutes</option>
+                  <option value={15 * 60 * 1000}>15 Minutes</option>
+                  <option value={30 * 60 * 1000}>30 Minutes</option>
+                  <option value={1 * 60 * 60 * 1000}>1 Hour</option>
+                  <option value={6 * 60 * 60 * 1000}>6 Hours</option>
+                  <option value={1 * 24 * 60 * 60 * 1000}>1 Day</option>
+                  <option value={3 * 24 * 60 * 60 * 1000}>3 Days</option>
+                  <option value={7 * 24 * 60 * 60 * 1000}>7 Days</option>
+                </Form.Select>
+              </IonRow>
+            </IonGrid>
           </IonCardContent>
         </IonCard>
       </Modal>
@@ -1083,7 +1117,7 @@ export const MyFiles = () => {
       getFolders();
       getAllFolders();
     }
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -1177,7 +1211,11 @@ export const MyFiles = () => {
               </IonButton>
             </>
           )}
-          <IonRow id="offline-grid" class="ion-justify-content-center">
+          <IonRow
+            id="offline-grid"
+            class="ion-justify-content-center"
+            ref={animateParent}
+          >
             {isLoggedIn && (
               <>
                 {files.map((file) => (
@@ -1224,6 +1262,13 @@ export const MyFiles = () => {
                           onClick={() => {
                             setCurrentFile(file);
                             setShowQr(true);
+                            setExpiryTime(
+                              new Date(
+                                Date.now() + Number.parseInt("5 * 60 * 1000")
+                              )
+                                .getTime()
+                                .toString()
+                            );
                           }}
                         >
                           Get QR code
